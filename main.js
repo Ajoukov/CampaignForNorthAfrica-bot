@@ -19,5 +19,9 @@ gameEngine.loop();
 
 // Log initialization
 logger.log('[1.0]', 'Campaign for North Africa - Comprehensive Rules Engine Initialized', 'INFO');
-logger.log('[2.0]', 'Game setup complete - Rules 1-15 implemented', 'INFO');
+logger.log('[2.0]', 'Game setup complete - Rules 1-30 implemented', 'INFO');
+
+// Make logger globally accessible for console commands
+window.logger = logger;
+window.gameEngine = gameEngine;
 

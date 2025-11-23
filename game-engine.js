@@ -389,19 +389,23 @@ class CNAGameEngine {
     // ========================================================================
     
     determineWeather() {
-        // Temperature variation
-        this.gameState.weather.temp += (Math.random() - 0.5) * 3;
-        this.gameState.weather.temp = Math.max(20, Math.min(50, this.gameState.weather.temp));
-        
-        // [29.4] Sandstorms (Ghibli)
-        Rule_Ghibli.execute(this.gameState.weather);
-        
-        // [29.5] Rainstorms (rare)
-        if (Math.random() < 0.02 && this.gameState.weather.temp < 25) {
-            this.gameState.weather.condition = 'RAIN';
-            logger.log('[29.5]', 'Rainstorm begins - movement restricted', 'WARN');
-        } else if (this.gameState.weather.condition === 'RAIN' && Math.random() < 0.3) {
-            this.gameState.weather.condition = 'NORMAL';
+        // Use advanced weather system
+        if (typeof CNA_AdvancedRules !== 'undefined') {
+            CNA_AdvancedRules.WeatherSystem.determineWeather(this.gameState);
+            
+            const effects = CNA_AdvancedRules.WeatherSystem.getWeatherEffects(this.gameState.weather);
+            
+            if (this.gameState.weather.condition !== 'NORMAL') {
+                logger.log('[29.0]', 
+                    `Weather: ${this.gameState.weather.condition} (${Math.floor(this.gameState.weather.temp)}°C)`,
+                    'INFO'
+                );
+            }
+        } else {
+            // Fallback to basic weather
+            this.gameState.weather.temp += (Math.random() - 0.5) * 3;
+            this.gameState.weather.temp = Math.max(20, Math.min(50, this.gameState.weather.temp));
+            Rule_Ghibli.execute(this.gameState.weather);
         }
     }
     
@@ -458,6 +462,20 @@ class CNAGameEngine {
             if (unit.status !== 'ACTIVE') continue;
             if (this.gameState.weather.ghibli) continue; // No movement in sandstorms
             
+            // Update morale
+            if (typeof CNA_AdvancedRules !== 'undefined' && Math.random() < 0.1) {
+                unit.morale = CNA_AdvancedRules.MoraleSystem.calculateCurrentMorale(
+                    unit, 
+                    this.gameState
+                );
+            }
+            
+            // Special forces raids
+            if (unit.type === 'SPECIAL_FORCES' && Math.random() < 0.05 && 
+                typeof CNA_AdvancedRules !== 'undefined') {
+                this.executeSpecialForcesRaid(unit);
+            }
+            
             // Attempt movement
             if (Math.random() < 0.3) {
                 this.simulateMovement(unit);
@@ -471,11 +489,83 @@ class CNAGameEngine {
             Rule_Pasta.execute(unit);
             Rule_LOC.execute(unit, this.gameState.dumps);
             
-            // Repair broken units
+            // [22.0] Repair broken units
             if (unit.status === 'BROKEN' && Math.random() < 0.05) {
                 unit.status = 'ACTIVE';
                 STATS.repairs.value++;
                 logger.log('[22.2]', `${unit.name} repairs completed`);
+            }
+            
+            // [24.0] Random construction projects
+            if (unit.type === CNA_Rules.UnitType.ENGINEER_BN && 
+                Math.random() < 0.03 &&
+                typeof CNA_AdvancedRules !== 'undefined') {
+                this.simulateConstruction(unit);
+            }
+        }
+    }
+    
+    executeSpecialForcesRaid(unit) {
+        // Find enemy supply dumps
+        const enemyDumps = this.gameState.dumps.filter(d => d.faction !== unit.faction);
+        if (enemyDumps.length === 0) return;
+        
+        const target = enemyDumps[Math.floor(Math.random() * enemyDumps.length)];
+        const result = CNA_AdvancedRules.DesertRaiders.executeRaid(
+            unit,
+            { q: target.q, r: target.r },
+            this.gameState
+        );
+        
+        if (result.success) {
+            logger.log('[27.5]', `${unit.name} ${result.message}`, 'WARN');
+        } else if (result.detected) {
+            logger.log('[27.4]', `${unit.name} raid detected and aborted`, 'INFO');
+        }
+    }
+    
+    simulateConstruction(unit) {
+        const roll = Math.random();
+        
+        if (roll < 0.4) {
+            // Build fortifications
+            const result = CNA_AdvancedRules.Construction.constructFortification(
+                unit.position,
+                1,
+                this.gameState
+            );
+            if (result.success) {
+                logger.log('[24.4]', 
+                    `${unit.name} constructed fortifications (Level ${result.newLevel})`,
+                    'INFO'
+                );
+            }
+        } else if (roll < 0.7) {
+            // Lay minefields
+            const result = CNA_AdvancedRules.Construction.constructMinefield(
+                unit.position,
+                unit.faction,
+                'LIGHT',
+                this.gameState
+            );
+            if (result.success) {
+                logger.log('[24.3]', 
+                    `${unit.name} laid minefield`,
+                    'INFO'
+                );
+            }
+        } else {
+            // Build supply dump
+            const result = CNA_AdvancedRules.Construction.constructSupplyDump(
+                unit.position,
+                unit.faction,
+                this.gameState
+            );
+            if (result.success) {
+                logger.log('[24.9]', 
+                    `${unit.name} established supply dump`,
+                    'INFO'
+                );
             }
         }
     }
@@ -537,11 +627,10 @@ class CNAGameEngine {
     }
     
     processReinforcements() {
-        // Simplified reinforcement system
         // [20.1] Add new units based on historical schedule
         const turn = this.gameState.gameTurn.turnNumber;
         
-        // Example: Afrika Korps arrives turn 20 (Feb 1941)
+        // Afrika Korps arrives turn 20 (Feb 1941)
         if (turn === 20) {
             this.createUnit({
                 id: 'GER_5_LIGHT',
@@ -557,6 +646,36 @@ class CNAGameEngine {
             });
             
             logger.log('[20.1]', 'Afrika Korps arrives in Tripoli!', 'INFO');
+        }
+        
+        // [27.0] Long Range Desert Group arrives early
+        if (turn === 5 && typeof CNA_AdvancedRules !== 'undefined') {
+            const lrdg = CNA_AdvancedRules.DesertRaiders.createLRDG(this.gameState);
+            this.gameState.units.push(lrdg);
+            logger.log('[27.1]', 'Long Range Desert Group activated!', 'INFO');
+        }
+        
+        // [27.8] SAS arrives later
+        if (turn === 50 && typeof CNA_AdvancedRules !== 'undefined') {
+            const sas = CNA_AdvancedRules.DesertRaiders.createSAS(this.gameState);
+            this.gameState.units.push(sas);
+            logger.log('[27.8]', 'Special Air Service Brigade formed!', 'INFO');
+        }
+        
+        // German tank reinforcements
+        if (turn === 30) {
+            this.createUnit({
+                id: 'GER_15_PANZER',
+                name: '15th Panzer Division',
+                faction: 'AXIS',
+                nationality: 'GERMAN',
+                type: CNA_Rules.UnitType.TANK_BN,
+                position: { q: 5, r: 3 },
+                characteristicsKey: 'GER_TANK_BN',
+                morale: 2,
+                currentTOE: 12
+            });
+            logger.log('[20.1]', '15th Panzer Division arrives!', 'INFO');
         }
     }
     
@@ -574,9 +693,13 @@ class CNAGameEngine {
     
     setSpeed(v) {
         this.gameState.speed = v;
+        this.gameState.paused = (v === 0);
+        
         if (typeof document !== 'undefined') {
-            document.getElementById('speed-display').innerText = 
-                v === 0 ? 'PAUSED' : v + 'x';
+            const display = document.getElementById('speed-display');
+            if (display) {
+                display.innerText = v === 0 ? 'PAUSED' : v + 'x';
+            }
         }
     }
     

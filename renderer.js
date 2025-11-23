@@ -187,7 +187,7 @@ function renderTerrain(mapData) {
 function update3D(units) {
     if (!units) return;
     
-    units.forEach(u => {
+    units.forEach((u, index) => {
         if (!u.position) return; // Skip units without position
         
         let meshGroup = unitMeshes.get(u.id);

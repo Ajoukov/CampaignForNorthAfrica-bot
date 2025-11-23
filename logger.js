@@ -48,6 +48,85 @@ class Logger {
         `;
         paper.prepend(div);
     }
+    
+    // Export logs to downloadable file
+    exportLogs() {
+        const logText = this.logs.map(log => 
+            `[${log.date} Turn ${log.turn}] [${log.ruleRef}] ${log.type}: ${log.message}`
+        ).join('\n');
+        
+        const blob = new Blob([logText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cna-debug-log-${Date.now()}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        console.log('✅ Logs exported:', this.logs.length, 'entries');
+    }
+    
+    // Get diagnostic information
+    getDiagnostics() {
+        const gameRef = window.GLOBAL_GAME_REF;
+        const diagnostics = {
+            timestamp: new Date().toISOString(),
+            gameExists: !!gameRef,
+            logsCount: this.logs.length,
+            gameState: 'NOT_INITIALIZED'
+        };
+        
+        if (gameRef) {
+            try {
+                diagnostics.gameState = {
+                    exists: !!gameRef.gameState,
+                    units: gameRef.gameState?.units?.length || 0,
+                    paused: gameRef.gameState?.paused,
+                    speed: gameRef.gameState?.speed,
+                    turn: gameRef.gameState?.gameTurn?.turnNumber,
+                    date: gameRef.dateString || 'N/A',
+                    weather: gameRef.gameState?.weather?.condition || 'N/A'
+                };
+            } catch (e) {
+                diagnostics.error = e.message;
+            }
+        }
+        
+        console.log('🔍 DIAGNOSTICS:', JSON.stringify(diagnostics, null, 2));
+        return diagnostics;
+    }
+    
+    // Print detailed diagnostic report
+    printDiagnosticReport() {
+        console.log('='.repeat(80));
+        console.log('CAMPAIGN FOR NORTH AFRICA - DIAGNOSTIC REPORT');
+        console.log('='.repeat(80));
+        
+        const diag = this.getDiagnostics();
+        console.log('Game Reference:', diag.gameExists ? '✅ EXISTS' : '❌ MISSING');
+        console.log('Total Logs:', diag.logsCount);
+        
+        if (diag.gameState && typeof diag.gameState === 'object') {
+            console.log('\nGame State:');
+            console.log('  Units:', diag.gameState.units);
+            console.log('  Speed:', diag.gameState.speed);
+            console.log('  Paused:', diag.gameState.paused);
+            console.log('  Turn:', diag.gameState.turn);
+            console.log('  Date:', diag.gameState.date);
+            console.log('  Weather:', diag.gameState.weather);
+        }
+        
+        console.log('\nRecent Logs (last 10):');
+        this.logs.slice(0, 10).forEach((log, i) => {
+            console.log(`  ${i+1}. [${log.ruleRef}] ${log.message}`);
+        });
+        
+        console.log('\n' + '='.repeat(80));
+        console.log('To export full logs, run: logger.exportLogs()');
+        console.log('='.repeat(80));
+    }
 }
 
 const logger = new Logger();

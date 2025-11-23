@@ -30,6 +30,14 @@
                 <i data-lucide="newspaper" class="w-6 h-6 text-yellow-400"></i>
                 <span class="absolute left-14 top-2 bg-black text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition">War Diary (Logs)</span>
             </button>
+            <button onclick="logger.exportLogs()" class="glass-panel p-3 rounded-full hover:bg-green-900/50 transition group relative">
+                <i data-lucide="download" class="w-6 h-6 text-green-400"></i>
+                <span class="absolute left-14 top-2 bg-black text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition">Export Debug Logs</span>
+            </button>
+            <button onclick="logger.printDiagnosticReport()" class="glass-panel p-3 rounded-full hover:bg-purple-900/50 transition group relative">
+                <i data-lucide="bug" class="w-6 h-6 text-purple-400"></i>
+                <span class="absolute left-14 top-2 bg-black text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition">Diagnostics (Console)</span>
+            </button>
         </div>
 
         <!-- Top HUD -->
@@ -54,6 +62,11 @@
                 <div class="px-3 py-2 min-w-[60px] text-center font-mono text-yellow-500" id="speed-display">1x</div>
                 <button onclick="GLOBAL_GAME_REF.adjustSpeed(2)" class="px-3 py-2 hover:bg-white/10 font-bold">+</button>
             </div>
+            <button onclick="GLOBAL_GAME_REF.tick(); console.log('✅ Manual tick executed')" 
+                    class="glass-panel px-3 py-2 rounded hover:bg-green-900/50 transition text-xs font-bold text-green-400"
+                    title="Force a single tick">
+                TICK
+            </button>
         </div>
 
         <div class="flex justify-between items-end w-full gap-4 interactive">
@@ -116,6 +129,7 @@
     <script src="stats.js"></script>
     <script src="logger.js"></script>
     <script src="rules-core.js"></script>
+    <script src="rules-advanced.js"></script>
     <script src="rules.js"></script>
     <script src="game-engine.js"></script>
     <script src="game.js"></script>

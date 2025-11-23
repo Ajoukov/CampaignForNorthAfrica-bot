@@ -3,7 +3,8 @@
 const Rule_Pasta = {
     citation: '[Case 52.6]',
     execute: (unit) => {
-        if (unit.nationality !== 'ITALIAN') return;
+        if (!unit || unit.nationality !== 'ITALIAN') return;
+        if (!unit.supplies) return; // Skip if no supplies tracking
         
         if (Math.random() < 0.1) {
             const required = 10;
@@ -12,7 +13,12 @@ const Rule_Pasta = {
                 STATS.pasta_boiled.value += required;
                 logger.log('[Case 52.6]', `Italian unit ${unit.name} boils pasta. Water reserves depleted by ${required}L.`);
             } else {
-                unit.cohesion -= 15;
+                const cohesionDrop = 15;
+                if (unit.cohesionLevel !== undefined) {
+                    unit.cohesionLevel -= cohesionDrop;
+                } else if (unit.cohesion !== undefined) {
+                    unit.cohesion -= cohesionDrop;
+                }
                 STATS.italian_morale_failures.value++;
                 logger.log('[Case 52.6]', `DISASTER: ${unit.name} lacks water for pasta! Cohesion collapses.`, 'CRITICAL');
             }
@@ -23,6 +29,8 @@ const Rule_Pasta = {
 const Rule_Evaporation = {
     citation: '[Case 44.3]',
     execute: (unit, weatherTemp) => {
+        if (!unit || !unit.supplies || !unit.supplies.fuel) return; // Skip if no supplies
+        
         let rate = (unit.faction === 'AXIS') ? 0.03 : 0.07;
         if (weatherTemp > 35) rate *= 1.5;
         
@@ -63,12 +71,17 @@ const Rule_Breakdown = {
 const Rule_LOC = {
     citation: '[Case 31.2]',
     execute: (unit, dumps) => {
+        if (!unit || !unit.position) return; // Skip if no position
+        
         let valid = false;
         
         for (let dump of dumps) {
             if (dump.faction !== unit.faction) continue;
             
-            const d = Math.sqrt(Math.pow(unit.q - dump.q, 2) + Math.pow(unit.r - dump.r, 2));
+            const unitQ = unit.position.q !== undefined ? unit.position.q : unit.q;
+            const unitR = unit.position.r !== undefined ? unit.position.r : unit.r;
+            
+            const d = Math.sqrt(Math.pow(unitQ - dump.q, 2) + Math.pow(unitR - dump.r, 2));
             if (d < 20) { 
                 valid = true; 
                 break; 
@@ -77,7 +90,12 @@ const Rule_LOC = {
         
         if (!valid) {
             STATS.loc_failures.value++;
-            unit.cohesion -= 2;
+            
+            if (unit.cohesionLevel !== undefined) {
+                unit.cohesionLevel -= 2;
+            } else if (unit.cohesion !== undefined) {
+                unit.cohesion -= 2;
+            }
             
             if (Math.random() < 0.05) {
                 logger.log('[Case 31.2]', `${unit.name} is OUT OF SUPPLY. LOC severed.`, 'WARN');
