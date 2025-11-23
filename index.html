@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Campaign for North Africa (SPI 1979) - Rule Simulator</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div id="game-layer"></div>
+
+    <!-- UI Layer -->
+    <div id="ui-layer" class="w-full h-full flex flex-col justify-between p-4">
+        
+        <div class="flex flex-col gap-2 items-start interactive">
+            <button onclick="ui.toggleStats()" class="glass-panel p-3 rounded-full hover:bg-blue-900/50 transition group relative">
+                <i data-lucide="info" class="w-6 h-6 text-blue-400"></i>
+                <span class="absolute left-14 top-2 bg-black text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition">Statistics Registry</span>
+            </button>
+            <button onclick="ui.toggleNewspaper()" class="glass-panel p-3 rounded-full hover:bg-yellow-900/50 transition group relative">
+                <i data-lucide="newspaper" class="w-6 h-6 text-yellow-400"></i>
+                <span class="absolute left-14 top-2 bg-black text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition">War Diary (Logs)</span>
+            </button>
+        </div>
+
+        <div class="absolute top-4 right-4 interactive flex gap-2">
+            <div class="glass-panel rounded flex overflow-hidden">
+                <button onclick="game.setSpeed(0)" class="px-3 py-2 hover:bg-white/10 border-r border-gray-700">
+                    <i data-lucide="pause" class="w-4 h-4"></i>
+                </button>
+                <button onclick="game.adjustSpeed(0.5)" class="px-3 py-2 hover:bg-white/10 border-r border-gray-700 font-bold">-</button>
+                <div class="px-3 py-2 min-w-[60px] text-center font-mono text-yellow-500" id="speed-display">1x</div>
+                <button onclick="game.adjustSpeed(2)" class="px-3 py-2 hover:bg-white/10 font-bold">+</button>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-end w-full gap-4 interactive">
+            <div class="glass-panel rounded w-80 p-4 transition-all duration-300 transform translate-y-0" id="inspector-panel">
+                <div class="flex justify-between items-center border-b border-gray-600 mb-2 pb-1">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase">Hex Inspector</h3>
+                    <span id="insp-coords" class="text-xs font-mono text-yellow-500">--</span>
+                </div>
+                <div id="inspector-content" class="min-h-[100px] text-xs space-y-2">
+                    <div class="text-gray-500 italic">Select a hex to inspect details.</div>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded flex-1 max-w-2xl p-2 h-32 overflow-hidden flex flex-col justify-end">
+                <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1 border-b border-gray-700">Live Wire</div>
+                <div id="live-ticker" class="space-y-1 text-xs font-mono"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div id="modal-stats" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center interactive">
+        <div class="glass-panel w-full max-w-2xl h-[80vh] rounded-lg flex flex-col p-6 m-4 bg-gray-900">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-blue-400 flex items-center gap-2">
+                    <i data-lucide="bar-chart-2"></i> Statistical Registry
+                </h2>
+                <button onclick="ui.toggleStats()" class="text-gray-400 hover:text-white"><i data-lucide="x"></i></button>
+            </div>
+            <div class="mb-4">
+                <input type="text" id="stats-search" placeholder="Search metrics..." 
+                       class="w-full bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white focus:border-blue-500 outline-none"
+                       onkeyup="ui.filterStats()">
+            </div>
+            <div class="flex-1 overflow-y-auto pr-2">
+                <div id="stats-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Newspaper Modal -->
+    <div id="modal-newspaper" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center interactive">
+        <div class="glass-panel w-full max-w-4xl h-[90vh] rounded-lg flex flex-col p-0 bg-[#fdf6e3] text-gray-900 overflow-hidden relative">
+            <div class="bg-[#1a1a1a] text-[#fdf6e3] p-4 flex justify-between items-center border-b-4 border-double border-gray-600">
+                <div>
+                    <h1 class="text-3xl font-serif font-black tracking-tighter uppercase">The Desert War Diary</h1>
+                    <div class="text-xs font-mono opacity-75">OFFICIAL LOG OF THE CAMPAIGN FOR NORTH AFRICA</div>
+                </div>
+                <button onclick="ui.toggleNewspaper()" class="text-white hover:text-red-400"><i data-lucide="x" class="w-8 h-8"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-8 font-serif bg-[url('https://www.transparenttextures.com/patterns/aged-paper.png')]">
+                <div class="max-w-3xl mx-auto border-l-2 border-r-2 border-dotted border-gray-400 min-h-full px-8 bg-white/50 shadow-inner">
+                    <div id="newspaper-content" class="space-y-6"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Modules -->
+    <script src="stats.js"></script>
+    <script src="logger.js"></script>
+    <script src="rules.js"></script>
+    <script src="game.js"></script>
+    <script src="ui.js"></script>
+    <script src="renderer.js"></script>
+    <script src="main.js"></script>
+
+</body>
+</html>
