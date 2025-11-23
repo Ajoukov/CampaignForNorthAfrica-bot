@@ -77,7 +77,8 @@ function renderTerrain(mapData) {
     const seaPlaneMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a, side: THREE.DoubleSide });
     const seaPlane = new THREE.Mesh(seaPlaneGeo, seaPlaneMat);
     seaPlane.rotation.x = -Math.PI / 2;
-    seaPlane.position.set(75, -0.2, -248);
+    seaPlane.rotation.z = -0.005;
+    seaPlane.position.set(75, -0.2, -248.5);
     scene.add(seaPlane);
 
     // Desert (South)
