@@ -6,13 +6,18 @@ lucide.createIcons();
 // Initialize 3D renderer
 init3D();
 
-// Create game instance
-const game = new Game();
-GLOBAL_GAME_REF = game;
+// Create game instance using new comprehensive engine
+const gameEngine = new CNAGameEngine();
+const game = gameEngine; // Backwards compatibility
+GLOBAL_GAME_REF = gameEngine;
 
 // Render terrain
-renderTerrain(game.map); 
+renderTerrain(gameEngine.gameState.map); 
 
 // Start game loop
-game.loop();
+gameEngine.loop();
+
+// Log initialization
+logger.log('[1.0]', 'Campaign for North Africa - Comprehensive Rules Engine Initialized', 'INFO');
+logger.log('[2.0]', 'Game setup complete - Rules 1-15 implemented', 'INFO');
 
