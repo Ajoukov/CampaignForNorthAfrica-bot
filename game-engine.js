@@ -427,6 +427,29 @@ class CNAGameEngine {
         if (typeof update3D !== 'undefined') {
             update3D(this.gameState.units);
         }
+        
+        // Update HUD
+        this.updateHUD();
+    }
+    
+    updateHUD() {
+        // Update game date display
+        const dateEl = document.getElementById('game-date');
+        if (dateEl) {
+            dateEl.textContent = this.dateString;
+        }
+        
+        // Update turn number
+        const turnEl = document.getElementById('game-turn');
+        if (turnEl) {
+            turnEl.textContent = this.gameState.gameTurn.turnNumber;
+        }
+        
+        // Update operations stage
+        const stageEl = document.getElementById('game-stage');
+        if (stageEl) {
+            stageEl.textContent = this.gameState.currentOperationsStage;
+        }
     }
     
     simulateUnitActions() {

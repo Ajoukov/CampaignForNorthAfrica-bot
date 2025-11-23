@@ -32,14 +32,27 @@
             </button>
         </div>
 
+        <!-- Top HUD -->
+        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 interactive">
+            <div class="glass-panel rounded px-6 py-3">
+                <div class="text-center">
+                    <div class="text-xs text-gray-400 uppercase tracking-wider">Campaign for North Africa</div>
+                    <div class="text-lg font-bold text-yellow-400" id="game-date">September 13, 1940</div>
+                    <div class="text-xs text-gray-500 font-mono">
+                        Turn <span id="game-turn">1</span> | Stage <span id="game-stage">1</span> of 3
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="absolute top-4 right-4 interactive flex gap-2">
             <div class="glass-panel rounded flex overflow-hidden">
-                <button onclick="game.setSpeed(0)" class="px-3 py-2 hover:bg-white/10 border-r border-gray-700">
+                <button onclick="GLOBAL_GAME_REF.setSpeed(0)" class="px-3 py-2 hover:bg-white/10 border-r border-gray-700">
                     <i data-lucide="pause" class="w-4 h-4"></i>
                 </button>
-                <button onclick="game.adjustSpeed(0.5)" class="px-3 py-2 hover:bg-white/10 border-r border-gray-700 font-bold">-</button>
+                <button onclick="GLOBAL_GAME_REF.adjustSpeed(0.5)" class="px-3 py-2 hover:bg-white/10 border-r border-gray-700 font-bold">-</button>
                 <div class="px-3 py-2 min-w-[60px] text-center font-mono text-yellow-500" id="speed-display">1x</div>
-                <button onclick="game.adjustSpeed(2)" class="px-3 py-2 hover:bg-white/10 font-bold">+</button>
+                <button onclick="GLOBAL_GAME_REF.adjustSpeed(2)" class="px-3 py-2 hover:bg-white/10 font-bold">+</button>
             </div>
         </div>
 

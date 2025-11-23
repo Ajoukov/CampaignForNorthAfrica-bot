@@ -1,5 +1,7 @@
 // --- 3D RENDERER ---
 let scene, camera, renderer, controls, unitMeshes = new Map();
+let cityMarkers = [];
+let dumpMarkers = [];
 const HEX_SIZE = 0.5;
 
 function init3D() {
@@ -30,11 +32,16 @@ function init3D() {
     };
     controls.update();
     
-    // Lighting
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    // Enhanced Lighting
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
     dirLight.position.set(65, 50, 20);
     scene.add(dirLight);
-    scene.add(new THREE.AmbientLight(0x808080));
+    
+    const dirLight2 = new THREE.DirectionalLight(0xffd700, 0.5);
+    dirLight2.position.set(-20, 30, -10);
+    scene.add(dirLight2);
+    
+    scene.add(new THREE.AmbientLight(0xa0a0a0));
 
     // Window Resize
     window.addEventListener('resize', () => {
@@ -70,6 +77,24 @@ function renderTerrain(mapData) {
 
     // Hex Geometry
     const hexGeo = new THREE.CylinderGeometry(HEX_SIZE, HEX_SIZE, 0.2, 6);
+    
+    // Create hexagonal outline (top only)
+    function createHexOutline() {
+        const points = [];
+        for (let i = 0; i <= 6; i++) {
+            const angle = (Math.PI / 3) * i;
+            points.push(new THREE.Vector3(
+                HEX_SIZE * Math.cos(angle),
+                0,
+                HEX_SIZE * Math.sin(angle)
+            ));
+        }
+        const hexOutlineGeo = new THREE.BufferGeometry().setFromPoints(points);
+        return hexOutlineGeo;
+    }
+    
+    const hexOutlineGeo = createHexOutline();
+    const hexOutlineMat = new THREE.LineBasicMaterial({ color: 0x444444, linewidth: 1 });
 
     // Infinite Backdrop Planes
     // Sea (North)
@@ -104,12 +129,21 @@ function renderTerrain(mapData) {
                 yOff = 0.1; 
             } else if (tile.type === 'ESCARPMENT') { 
                 mat = matEscarp; 
-                yOff = 0.3; 
+                yOff = 0.2; 
             } else if (tile.type === 'ROAD') {
                 mat = matRoad;
             } else if (tile.type === 'CITY') { 
                 mat = matCity; 
-                yOff = 0.2; 
+                yOff = 0.2;
+                
+                // Add city marker - tall building
+                const cityGeo = new THREE.BoxGeometry(HEX_SIZE * 0.5, 1.5, HEX_SIZE * 0.5);
+                const cityMat = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+                const cityMarker = new THREE.Mesh(cityGeo, cityMat);
+                const pos = getHexPos(q, r);
+                cityMarker.position.set(pos.x, 0.75, pos.z);
+                scene.add(cityMarker);
+                cityMarkers.push(cityMarker);
             } else if (tile.type === 'SALT_MARSH') {
                 mat = matMarsh;
             }
@@ -119,6 +153,33 @@ function renderTerrain(mapData) {
             mesh.position.set(pos.x, yOff, pos.z);
             mesh.userData = { q, r }; // Store coords for clicking
             scene.add(mesh);
+            
+            // Add hex grid outline on top (except for sea hexes)
+            if (tile.type !== 'SEA') {
+                const outline = new THREE.Line(hexOutlineGeo, hexOutlineMat);
+                outline.position.set(pos.x, yOff + 0.11, pos.z);
+                // outline.rotation.x = Math.PI / 2; // Rotate to lay flat on top
+                outline.rotation.y = Math.PI / 6; // Rotate 30 degrees to align with hex
+                scene.add(outline);
+            }
+        }
+    }
+    
+    // Add supply dump markers
+    if (GLOBAL_GAME_REF && GLOBAL_GAME_REF.gameState) {
+        const dumps = GLOBAL_GAME_REF.gameState.dumps;
+        if (dumps) {
+            dumps.forEach(dump => {
+                const dumpGeo = new THREE.ConeGeometry(HEX_SIZE * 0.3, 0.8, 4);
+                const dumpColor = dump.faction === 'AXIS' ? 0xff0000 : 0x0000ff;
+                const dumpMat = new THREE.MeshLambertMaterial({ color: dumpColor });
+                const dumpMarker = new THREE.Mesh(dumpGeo, dumpMat);
+                const pos = getHexPos(dump.q, dump.r);
+                dumpMarker.position.set(pos.x + 0.3, 1.2, pos.z);
+                dumpMarker.rotation.y = Math.PI / 4;
+                scene.add(dumpMarker);
+                dumpMarkers.push(dumpMarker);
+            });
         }
     }
 }
@@ -127,32 +188,202 @@ function update3D(units) {
     if (!units) return;
     
     units.forEach(u => {
-        let mesh = unitMeshes.get(u.id);
-        if (!mesh) {
-            const geo = new THREE.BoxGeometry(HEX_SIZE, HEX_SIZE, HEX_SIZE);
-            const mat = new THREE.MeshLambertMaterial({ 
-                color: u.faction === 'AXIS' ? 0xef4444 : 0x3b82f6 
-            });
-            mesh = new THREE.Mesh(geo, mat);
-            scene.add(mesh);
-            unitMeshes.set(u.id, mesh);
+        if (!u.position) return; // Skip units without position
+        
+        let meshGroup = unitMeshes.get(u.id);
+        
+        if (!meshGroup) {
+            // Create a group to hold multiple meshes for each unit
+            meshGroup = new THREE.Group();
+            
+            // Determine unit type and create appropriate geometry
+            let mainMesh;
+            const factionColor = u.faction === 'AXIS' ? 0xff4444 : 0x4488ff;
+            const nationalityColor = getNationalityColor(u.nationality);
+            
+            if (u.type && u.type.includes('TANK')) {
+                // Tank units - larger, tank-shaped
+                const tankBody = new THREE.BoxGeometry(HEX_SIZE * 0.6, HEX_SIZE * 0.3, HEX_SIZE * 0.8);
+                const tankTurret = new THREE.CylinderGeometry(HEX_SIZE * 0.25, HEX_SIZE * 0.25, HEX_SIZE * 0.3, 8);
+                
+                const bodyMesh = new THREE.Mesh(tankBody, 
+                    new THREE.MeshLambertMaterial({ color: nationalityColor }));
+                const turretMesh = new THREE.Mesh(tankTurret, 
+                    new THREE.MeshLambertMaterial({ color: factionColor }));
+                
+                turretMesh.position.y = 0.3;
+                meshGroup.add(bodyMesh);
+                meshGroup.add(turretMesh);
+                mainMesh = bodyMesh;
+            } else if (u.type && u.type.includes('HQ')) {
+                // HQ units - flag/star shape
+                const starGeo = new THREE.ConeGeometry(HEX_SIZE * 0.4, HEX_SIZE * 0.8, 5);
+                mainMesh = new THREE.Mesh(starGeo, 
+                    new THREE.MeshLambertMaterial({ color: factionColor }));
+                mainMesh.rotation.x = Math.PI;
+                meshGroup.add(mainMesh);
+            } else if (u.type && u.type.includes('ARTILLERY')) {
+                // Artillery - cannon shape
+                const baseGeo = new THREE.BoxGeometry(HEX_SIZE * 0.4, HEX_SIZE * 0.2, HEX_SIZE * 0.4);
+                const barrelGeo = new THREE.CylinderGeometry(HEX_SIZE * 0.1, HEX_SIZE * 0.1, HEX_SIZE * 0.6, 8);
+                
+                const base = new THREE.Mesh(baseGeo, 
+                    new THREE.MeshLambertMaterial({ color: nationalityColor }));
+                const barrel = new THREE.Mesh(barrelGeo, 
+                    new THREE.MeshLambertMaterial({ color: 0x333333 }));
+                
+                barrel.rotation.z = Math.PI / 2;
+                barrel.position.x = HEX_SIZE * 0.3;
+                barrel.position.y = 0.1;
+                
+                meshGroup.add(base);
+                meshGroup.add(barrel);
+                mainMesh = base;
+            } else {
+                // Infantry and other units - simple block
+                const geo = new THREE.BoxGeometry(HEX_SIZE * 0.5, HEX_SIZE * 0.5, HEX_SIZE * 0.5);
+                mainMesh = new THREE.Mesh(geo, 
+                    new THREE.MeshLambertMaterial({ color: factionColor }));
+                meshGroup.add(mainMesh);
+            }
+            
+            // Add status indicator ring
+            const ringGeo = new THREE.TorusGeometry(HEX_SIZE * 0.4, HEX_SIZE * 0.05, 8, 16);
+            const ringMesh = new THREE.Mesh(ringGeo, 
+                new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+            ringMesh.rotation.x = Math.PI / 2;
+            ringMesh.position.y = -HEX_SIZE * 0.3;
+            ringMesh.visible = false;
+            meshGroup.add(ringMesh);
+            meshGroup.userData.statusRing = ringMesh;
+            
+            scene.add(meshGroup);
+            unitMeshes.set(u.id, meshGroup);
         }
         
-        const pos = getHexPos(u.q, u.r);
-        mesh.position.set(pos.x, 0.4, pos.z);
+        // Update position (FIX: use u.position.q and u.position.r)
+        const pos = getHexPos(u.position.q, u.position.r);
+        meshGroup.position.set(pos.x, 0.3, pos.z);
         
-        if (u.status === 'BROKEN') {
-            mesh.rotation.y += 0.1;
-        } else {
-            mesh.rotation.y = 0;
+        // Update status indicators
+        const statusRing = meshGroup.userData.statusRing;
+        if (statusRing) {
+            if (u.status === 'BROKEN') {
+                statusRing.visible = true;
+                statusRing.material.color.setHex(0xff0000); // Red for broken
+                meshGroup.rotation.y += 0.02; // Spin broken units
+            } else if (u.cohesionLevel && u.cohesionLevel < -10) {
+                statusRing.visible = true;
+                statusRing.material.color.setHex(0xffaa00); // Orange for low cohesion
+            } else if (u.status === 'DESTROYED') {
+                meshGroup.visible = false; // Hide destroyed units
+            } else {
+                statusRing.visible = false;
+                meshGroup.rotation.y = 0;
+            }
+        }
+        
+        // Scale based on TOE strength
+        if (u.currentTOE && u.characteristics && u.characteristics.maxTOE) {
+            const scale = 0.5 + (u.currentTOE / u.characteristics.maxTOE) * 0.5;
+            meshGroup.scale.set(scale, scale, scale);
         }
     });
+    
+    // Remove destroyed units
+    unitMeshes.forEach((mesh, id) => {
+        const unit = units.find(u => u.id === id);
+        if (!unit || unit.status === 'DESTROYED') {
+            scene.remove(mesh);
+            unitMeshes.delete(id);
+        }
+    });
+}
+
+function getNationalityColor(nationality) {
+    const colors = {
+        'ITALIAN': 0x009246,  // Italian green
+        'GERMAN': 0x808080,   // German grey
+        'BRITISH': 0x8B4513,  // British tan
+        'AUSTRALIAN': 0x228B22, // Australian green
+        'NEW_ZEALAND': 0x000080, // NZ navy blue
+        'INDIAN': 0xD2691E    // Indian brown
+    };
+    return colors[nationality] || 0x888888;
 }
 
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
+    
+    // Animate city markers (pulsing)
+    const time = Date.now() * 0.001;
+    cityMarkers.forEach((marker, i) => {
+        marker.position.y = 0.75 + Math.sin(time + i) * 0.1;
+    });
+    
+    // Animate supply dump markers (rotation)
+    dumpMarkers.forEach((marker, i) => {
+        marker.rotation.y += 0.01;
+    });
+    
     renderer.render(scene, camera);
+}
+
+// Add visual effect for combat
+function addCombatEffect(q, r) {
+    const pos = getHexPos(q, r);
+    
+    // Create explosion particles
+    const particleGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const particleMat = new THREE.MeshBasicMaterial({ color: 0xff6600 });
+    
+    for (let i = 0; i < 10; i++) {
+        const particle = new THREE.Mesh(particleGeo, particleMat);
+        particle.position.set(
+            pos.x + (Math.random() - 0.5) * 2,
+            1 + Math.random() * 2,
+            pos.z + (Math.random() - 0.5) * 2
+        );
+        scene.add(particle);
+        
+        // Animate and remove after delay
+        setTimeout(() => {
+            let alpha = 1.0;
+            const fadeInterval = setInterval(() => {
+                alpha -= 0.1;
+                if (alpha <= 0) {
+                    scene.remove(particle);
+                    clearInterval(fadeInterval);
+                }
+            }, 50);
+        }, 100);
+    }
+}
+
+// Add movement trail effect
+function addMovementTrail(fromQ, fromR, toQ, toR, faction) {
+    const from = getHexPos(fromQ, fromR);
+    const to = getHexPos(toQ, toR);
+    
+    const points = [
+        new THREE.Vector3(from.x, 0.3, from.z),
+        new THREE.Vector3(to.x, 0.3, to.z)
+    ];
+    
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ 
+        color: faction === 'AXIS' ? 0xff4444 : 0x4488ff,
+        linewidth: 2
+    });
+    
+    const line = new THREE.Line(geometry, material);
+    scene.add(line);
+    
+    // Remove after delay
+    setTimeout(() => {
+        scene.remove(line);
+    }, 2000);
 }
 
 // Mouse interaction for Inspector
